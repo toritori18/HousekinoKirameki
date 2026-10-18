@@ -1,0 +1,20 @@
+# ruff・mypy・pytest の設定ファイル。
+#
+# 依存パッケージは requirements.txt / requirements-dev.txt で管理する。
+# このひな形はライブラリとして配布することを前提にしていないため、[project] は定義しない
+# （定義するとパッケージのビルド設定が必要になり、src/ が空の段階で pip install が失敗する）。
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# E: pycodestyle（エラー）, F: Pyflakes, I: isort（インポート順）, UP: pyupgrade
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+strict = true
+# 型スタブが無いサードパーティ製ライブラリのせいで全体が止まらないようにする
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

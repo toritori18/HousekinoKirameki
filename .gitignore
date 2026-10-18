@@ -1,0 +1,51 @@
+# 依存パッケージ
+/node_modules
+.venv/
+venv/
+
+# ビルド・実行時の生成物
+/.next/
+/out/
+/build
+/dist
+bin/
+obj/
+__pycache__/
+*.py[cod]
+
+# 実行時のログ（/server:start が出力する）
+/logs/
+
+# 環境変数（絶対にコミットしない）
+.env
+.env.local
+.env.*.local
+
+# SQLファイル（スキーマ・データは環境依存のためコミットしない。フォルダ自体は .gitkeep で保持）
+docs/sql/*
+!docs/sql/.gitkeep
+
+# 振り返り報告書（社内向けの記述を含むため版管理しない）
+docs/retrospective-*.md
+
+# Claude Code 個人設定（チーム共有しない）
+.claude/settings.local.json
+
+# Claude Code フックが生成する一時ファイル
+.claude/.stop-check-cache
+
+# OS
+.DS_Store
+Thumbs.db
+
+# エディタ
+.vscode/
+.idea/
+
+# デバッグログ
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Vercel
+.vercel

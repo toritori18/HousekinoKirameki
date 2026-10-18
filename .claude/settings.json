@@ -1,0 +1,77 @@
+{
+  "permissions": {
+    "allow": [
+      "Write",
+      "Edit",
+      "Read",
+      "Glob",
+      "Grep",
+      "PowerShell(.\\.claude\\commands\\setup.ps1)",
+      "PowerShell(.\\.claude\\commands\\setup.ps1:*)",
+      "PowerShell(.\\.claude\\commands\\check.ps1)",
+      "PowerShell(.\\.claude\\commands\\run.ps1:*)",
+      "PowerShell(.\\.claude\\commands\\verify-docs.ps1)",
+      "PowerShell(.\\.claude\\commands\\git\\init.ps1)",
+      "PowerShell(.\\.claude\\commands\\git\\branch.ps1:*)",
+      "PowerShell(.\\.claude\\commands\\git\\push.ps1:*)",
+      "PowerShell(.\\.claude\\commands\\git\\cleanup.ps1)",
+      "PowerShell(.\\.claude\\commands\\git\\cleanup.ps1:*)",
+      "PowerShell(.\\.claude\\commands\\server\\start.ps1)",
+      "PowerShell(.\\.claude\\commands\\server\\stop.ps1)",
+      "PowerShell(git status:*)",
+      "PowerShell(git diff:*)",
+      "PowerShell(git log:*)",
+      "PowerShell(git add:*)",
+      "PowerShell(gh pr:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Edit(./.claude/settings.json)",
+      "Write(./.claude/settings.json)",
+      "Edit(./.claude/hooks/**)",
+      "Write(./.claude/hooks/**)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "& ./.claude/hooks/stop-check-code-changes.ps1",
+            "shell": "powershell"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "& ./.claude/hooks/guard-claude-md.ps1",
+            "shell": "powershell"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "& ./.claude/session-check.ps1",
+            "shell": "powershell"
+          },
+          {
+            "type": "command",
+            "command": "& ./.claude/hooks/inject-factcheck.ps1",
+            "shell": "powershell"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "stack": "python",
+  "description": "Python + ruff + mypy + pytest",
+  "install": "python -m pip install -r requirements-dev.txt",
+  "devServer": {
+    "command": null,
+    "port": null
+  },
+  "commands": {
+    "lint": "python -m ruff check .",
+    "format": "python -m ruff format .",
+    "typecheck": "python -m mypy .",
+    "test": "python -m pytest",
+    "build": null
+  },
+  "check": ["verify-docs", "lint", "typecheck", "test"],
+  "contributing": {
+    ".py": "docs/PY-contributing.md",
+    ".ps1": "docs/powershell-contributing.md"
+  }
+}

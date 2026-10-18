@@ -1,0 +1,22 @@
+{
+  "stack": "dotnet",
+  "description": ".NET (C#) + xUnit",
+  "install": null,
+  "devServer": {
+    "command": null,
+    "port": null
+  },
+  "commands": {
+    "lint": "dotnet format --verify-no-changes",
+    "format": "dotnet format",
+    "typecheck": null,
+    "test": "dotnet test",
+    "build": "dotnet build -c Release"
+  },
+  "check": ["verify-docs", "lint", "test", "build"],
+  "contributing": {
+    ".cs": "docs/CS-contributing.md",
+    ".csproj": "docs/CS-contributing.md",
+    ".ps1": "docs/powershell-contributing.md"
+  }
+}

@@ -1,0 +1,31 @@
+# エディタ間でインデント・文字コード・改行を統一する
+# https://editorconfig.org
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true
+
+[*.md]
+# Markdown は行末スペース 2 個が改行の意味を持つため削除しない
+trim_trailing_whitespace = false
+
+# PowerShell 5.1 は BOM なしだと日本語を ANSI として誤読するため、BOM 必須
+# （詳細は docs/powershell-contributing.md の「ファイル形式」）
+[*.ps1]
+charset = utf-8-bom
+# 同梱の .ps1 はすべてスペース4で書かれている（[*] の 2 とは異なる）
+indent_size = 4
+
+# git hooks は bash スクリプト（拡張子なし）。BOM が付くと shebang が
+# `#!/bin/bash\xEF\xBB\xBF` のように壊れて実行できなくなる
+[.claude/hooks/pre-push]
+charset = utf-8
+
+# C# と Python は言語の慣例に合わせてスペース4
+[*.{cs,csproj,py}]
+indent_size = 4

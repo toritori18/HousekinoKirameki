@@ -1,0 +1,99 @@
+#!/bin/bash
+# push前の機密情報チェックスクリプト
+
+echo ""
+echo "============================="
+echo " push前 機密情報チェック実行中"
+echo "============================="
+echo ""
+
+FOUND=0
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    # ブランチ削除の場合はスキップ
+    if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+        continue
+    fi
+
+    # 差分の範囲を決定
+    if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+        # 新しいブランチ: origin/mainからの差分
+        BASE=$(git merge-base origin/main "$local_sha" 2>/dev/null || echo "")
+        if [ -z "$BASE" ]; then
+            DIFF=$(git show "$local_sha" 2>/dev/null)
+            CHANGED_FILES=$(git show --name-only --pretty=format: "$local_sha" 2>/dev/null)
+        else
+            DIFF=$(git diff "$BASE" "$local_sha")
+            CHANGED_FILES=$(git diff --name-only "$BASE" "$local_sha")
+        fi
+    else
+        # 既存ブランチ: リモートとの差分
+        DIFF=$(git diff "$remote_sha" "$local_sha")
+        CHANGED_FILES=$(git diff --name-only "$remote_sha" "$local_sha")
+    fi
+
+    # 追加行のみ抽出（削除行は無視）
+    ADDED=$(echo "$DIFF" | grep '^+' | grep -v '^+++')
+
+    check_pattern() {
+        local pattern="$1"
+        local label="$2"
+        local result
+        result=$(echo "$ADDED" | grep -inE "$pattern" 2>/dev/null)
+        if [ -n "$result" ]; then
+            echo "[警告] $label の可能性があるデータを検出:"
+            echo "$result" | head -3
+            echo ""
+            FOUND=1
+        fi
+    }
+
+    # 機密情報パターンチェック
+    check_pattern 'api[_-]?key\s*[=:]\s*["'"'"'][a-zA-Z0-9_\-\.]{8,}["'"'"']' "APIキー"
+    check_pattern '(password|passwd)\s*=\s*["'"'"'][^"'"'"']{3,}["'"'"']' "パスワード"
+    check_pattern 'secret\s*[=:]\s*["'"'"'][a-zA-Z0-9_\-\.]{8,}["'"'"']' "シークレット"
+    check_pattern '(access_token|accesstoken)\s*[=:]\s*["'"'"'][a-zA-Z0-9_\-\.]{8,}["'"'"']' "アクセストークン"
+    check_pattern '-----BEGIN\s+(RSA |EC |DSA |OPENSSH )?PRIVATE KEY' "プライベートキー"
+    check_pattern 'AKIA[0-9A-Z]{16}' "AWS アクセスキー"
+    check_pattern 'Password=[A-Za-z0-9!@#$%^&*()_+]{3,}' "接続文字列パスワード"
+
+    # .env ファイルチェック
+    # .env.example などのテンプレートは値がプレースホルダで、意図的に追跡しているため
+    # ブロック対象から外す。ただし「.env」を含む他のパス（prod.env, config/app.env 等）は
+    # 従来どおり検出したいので、テンプレートの完全なベース名だけを除外する。
+    ENV_TEMPLATES=$(echo "$CHANGED_FILES" | grep -E '(^|/)\.env\.(example|sample|template)$')
+    ENV_FILES=$(echo "$CHANGED_FILES" | grep -E '\.env' \
+        | grep -vE '(^|/)\.env\.(example|sample|template)$')
+
+    # 除外したテンプレートは黙殺せず通知する。
+    # .env 形式の「KEY=value」は内容パターン検査（引用符必須）に掛からないため、
+    # 中身に本物の値が混ざっていないかは人の目で確認する必要がある。
+    if [ -n "$ENV_TEMPLATES" ]; then
+        echo "[情報] テンプレートのためブロック対象外（中身がプレースホルダか確認すること）:"
+        echo "$ENV_TEMPLATES"
+        echo ""
+    fi
+
+    if [ -n "$ENV_FILES" ]; then
+        echo "[警告] .env ファイルがコミットに含まれています:"
+        echo "$ENV_FILES"
+        echo ""
+        FOUND=1
+    fi
+
+done
+
+if [ "$FOUND" -eq 1 ]; then
+    echo "============================================="
+    echo " [NG] 機密情報の可能性があるデータを検出！"
+    echo "      push をブロックしました。"
+    echo ""
+    echo "      確認後、問題なければ以下で強制push可:"
+    echo "        git push --no-verify"
+    echo "============================================="
+    exit 1
+fi
+
+echo "[OK] 機密情報は検出されませんでした。push を続行します。"
+echo ""
+exit 0

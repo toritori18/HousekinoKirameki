@@ -1,0 +1,16 @@
+# 改行コードの正規化をリポジトリ側で固定する。
+# 個人の core.autocrlf 設定に依存させないための設定（設定が違う人が混ざっても差分が壊れない）。
+#
+# 本プロジェクトは .editorconfig の [*] で end_of_line = lf を採用しているため、
+# index だけでなく作業ツリーでも LF を維持する。
+
+# テキストファイルは index・作業ツリーとも LF にそろえる
+* text=auto eol=lf
+
+# git hooks は bash スクリプト（拡張子なし）。
+# CRLF になると shebang が `#!/bin/bash\r` と解釈されて実行できなくなるため、
+# 上の行で網羅されているが、壊れたときの影響が大きいので明示しておく。
+.claude/hooks/pre-push text eol=lf
+
+# バイナリは変換しない（自動判定に任せず明示する）
+*.png binary

@@ -1,0 +1,9 @@
+# 開発用の依存パッケージ。/setup と CI はこのファイルを使ってインストールする。
+-r requirements.txt
+
+# 静的解析・コード整形（/lint・/format）
+ruff
+# 型検査（/typecheck）
+mypy
+# テスト（/test）
+pytest

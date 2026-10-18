@@ -1,0 +1,56 @@
+# CI: PR および main へのプッシュ時に /check 相当を実行する。
+#
+# ローカルの /check（.claude/commands/check.ps1）をそのまま呼ぶ。実行されるステップは
+# .claude/project.json の check が持つため、スタックを変えてもこのファイルは変更しなくてよい。
+#
+# ランナーに windows-latest を使う理由:
+#   check.ps1 と verify-docs.ps1 は Windows PowerShell 5.1 向けに書かれており
+#   （docs/powershell-contributing.md の「実行環境」参照）、パスの連結にバックスラッシュを
+#   使うため Linux ランナーでは動作しない。shell: powershell は windows-latest 上の
+#   Windows PowerShell 5.1 を指す（pwsh = PowerShell 7 ではない）。ローカルと実行環境を合わせている。
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # ランタイムのセットアップは、該当する定義ファイルがある場合だけ行う。
+      # 複数のスタックに対応するため、必要なランタイムをファイルの有無で判定している。
+      - name: Node.js のセットアップ
+        if: hashFiles('package.json') != ''
+        uses: actions/setup-node@v7
+        with:
+          node-version: 'lts/*'
+
+      # npm ci ではなく npm install を使う。npm ci は package-lock.json が必須で、
+      # ロックファイルを作る前（/setup 直後の初回 CI）に失敗するため。
+      - name: 依存パッケージのインストール（Node.js）
+        if: hashFiles('package.json') != ''
+        run: npm install
+
+      - name: .NET のセットアップ
+        if: hashFiles('**/*.csproj') != ''
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Python のセットアップ
+        if: hashFiles('requirements-dev.txt') != ''
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.x'
+
+      - name: 依存パッケージのインストール（Python）
+        if: hashFiles('requirements-dev.txt') != ''
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: 総点検（/check と同じ処理）
+        shell: powershell
+        run: .\.claude\commands\check.ps1
