@@ -47,6 +47,12 @@
 │   ├── hooks/              # Git hooks・Claude Code フックスクリプト
 │   ├── agents/             # サブエージェント定義
 │   ├── skills/             # スキル定義
+│   ├── jev/                # 開発支援（TypeSafe AI jev との連携。API キー無時は非動作）
+│   │   ├── lib/            # 共有ライブラリ
+│   │   ├── config.json     # 設定（動作モード等）
+│   │   ├── select-docs.ps1 # 作業前の資料選び
+│   │   ├── check-commit.ps1 # コミット判定（ /git:push 内で実行）
+│   │   └── questions/      # jev の質問定義
 │   └── commands/           # カスタムスラッシュコマンド
 │       ├── check.ps1       # /check の実体
 │       ├── run.ps1         # /lint・/format・/typecheck・/test・/build の実体
@@ -68,6 +74,8 @@
     ├── development-setup.md # セットアップガイド
     ├── project-config.md   # .claude/project.json の仕様
     ├── powershell-contributing.md # PowerShell の規約
+    ├── jev.md              # jev による開発支援（API キー・設定・使い方）
+    ├── direction-proposal.md # ゲームの方向性（宝石のきらめき）
     └── sql/                # SQLファイル（マイグレーション・初期データ等）
 ```
 
@@ -119,7 +127,7 @@ Claude Code で使えるカスタムスラッシュコマンドの一覧です�
 | `/git:status` | 変更ファイルの一覧を表示 | `git status` | 随時 |
 | `/git:diff` | 変更内容の差分を表示 | `git diff` | コミット前の確認 |
 | `/git:log` | コミット履歴を1行ずつ表示 | `git log --oneline` | 随時 |
-| `/git:push "<メッセージ>"` | シークレット・main 直プッシュをチェックした上でコミット＆プッシュ | `git/push.ps1` | 作業の区切り |
+| `/git:push "<メッセージ>"` | シークレット・main 直プッシュ・テスト追加漏れ・コミット種類をチェックした上でコミット＆プッシュ（jev による判定を含む） | `git/push.ps1` | 作業の区切り |
 | `/git:pr` | 現在のブランチから main への PR を作成 | `gh pr create` | プッシュ後 |
 | `/git:merge` | CI の成功を確認して PR を main へマージ | `gh pr merge` | PR 作成後 |
 | `/git:cleanup` | マージ済みのローカルブランチを整理（既定は一覧表示のみ） | `git/cleanup.ps1` | ブランチが溜まったとき |
@@ -158,7 +166,7 @@ Claude Code が特定のタスクを委譲するサブエージェントの一�
 
 | エージェント | 役割 | ツール | 使うタイミング |
 |---|---|---|---|
-| `coder` | コンポーネント・関数・ロジックの実装と修正 | Read, Write, Edit, Glob, Grep, Bash | 実装するとき |
+| `coder` | コンポーネント・関数・ロジックの実装と修正 | Read, Write, Edit, Glob, Grep, Bash, PowerShell | 実装するとき |
 | `code-reviewer` | 規約ドキュメント・`factcheck.md` に基づくコードレビュー | Read, Grep, Glob | 実装完了後、コミット前 |
 | `readme-syncer` | README.md の記述と実体の乖離を検出・修正 | Read, Edit, Glob, Grep, Bash | コマンド・エージェント・構成を変更した後 |
 | `retrospective-writer` | 振り返り報告書の作成 | Read, Write, Glob, Grep, Bash, PowerShell | 開発の節目・振り返り依頼時 |
@@ -168,6 +176,7 @@ Claude Code が特定のタスクを委譲するサブエージェントの一�
 | スキル | 内容 |
 |---|---|
 | `retrospective` | 振り返り報告書の書き方・テンプレート（`retrospective-writer` が使用） |
+| `jev-select-docs` | 作業に着手する前に、読むべき資料を jev に選ばせて絞り込む（`coder` が実装前に実行） |
 
 ## ドキュメント
 
@@ -175,5 +184,7 @@ Claude Code が特定のタスクを委譲するサブエージェントの一�
 - [Git運用ルール](docs/git-rules.md)
 - [プロジェクト設定（.claude/project.json）](docs/project-config.md)
 - [コントリビュートガイド（PowerShell）](docs/powershell-contributing.md)
+- [jev による開発支援](docs/jev.md)
+- [ゲームの方向性（宝石のきらめき）](docs/direction-proposal.md)
 
 言語ごとのコントリビュートガイドは /setup で `docs/` に配置されます（`docs/TS-contributing.md`・`docs/CS-contributing.md`・`docs/PY-contributing.md`）。

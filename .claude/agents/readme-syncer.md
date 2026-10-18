@@ -56,7 +56,7 @@ model: claude-haiku-4-5-20251001
 
 **Read が拒否された・エラーになったことを「実在しない」と解釈してはならない。** `.claude/settings.json` の `permissions.deny` により、実在していても Read できないファイルがある。中身が読めないファイルは「実在するが内容を確認できなかった」として扱い、ツリーから削除せず、そのまま残して報告すること。
 
-> **注意すべき例**: `.env.example` は実在し `git ls-files` にも出るが、`permissions.deny` の `Read(./.env.*)` により Read できない。これを「実在しない」と判断してツリーから削除するのは**誤り**である。
+> **注意すべき例**: `.env.local` は実在していても、`.gitignore` 対象のため `git ls-files` に出ず、`permissions.deny` の `Read(./.env.*)` により Read もできない。これを「実在しない」と判断してツリーから削除するのは**誤り**である。
 
 `Bash` は git の**読み取り系コマンド**（`git ls-files` / `git check-ignore` / `git status` / `git log`）にのみ使う。ファイルの作成・変更・削除、ビルド、テスト実行、その他の副作用を伴うコマンドには使わない。`README.md` の編集は必ず `Edit` で行う。
 
@@ -135,7 +135,7 @@ model: claude-haiku-4-5-20251001
 
 | ファイル | 理由 |
 |---|---|
-| `CLAUDE.md` | `CLAUDE.md` の「基本ルール」により、変更はユーザーの明示的な指示がある場合のみ。`.claude/hooks/guard-claude-md.ps1` が確認を挟む設計になっている |
+| `CLAUDE.md` | 変更時は `.claude/hooks/guard-claude-md.ps1` がユーザー確認を挟む設計になっている |
 | `.claude/settings.json` | `permissions.deny` で自身の編集が禁止されている（自己保護設計） |
 | `.claude/hooks/` 配下 | 同上 |
 | `.claude/project.json` | 各コマンドの実体を定義する設定。README はそれを参照する側であり、向きを逆にしない |

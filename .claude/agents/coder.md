@@ -1,7 +1,7 @@
 ---
 name: coder
 description: プロジェクトのコーディング・実装を専門に行うエージェント。コンポーネント・関数・ロジックの新規実装や修正を行う際に使用する。実装前に .claude/factcheck.md のチェックリストに従い、パッケージ・API の実在確認を行う。
-tools: Read, Write, Edit, Glob, Grep, Bash
+tools: Read, Write, Edit, Glob, Grep, Bash, PowerShell
 model: sonnet
 ---
 
@@ -16,6 +16,7 @@ model: sonnet
 3. `.claude/factcheck.md` — ハルシネーション防止ルール（パッケージ・API の実在確認）
 4. `docs/tech-stack.md` — プロジェクトの技術スタック（フレームワーク・ライブラリのバージョン等）
 5. `.editorconfig` — 文字コード（BOM の有無）・改行コード・インデントの規約。これらの規約はこのファイルにのみ存在し、他の規約ドキュメントには記載されていない。違反してもエラーにならず処理が黙って壊れる場合があるため、ファイルを新規作成する際は必ず該当する拡張子のセクションを確認する
+6. `.\.claude\jev\select-docs.ps1 -Task "<作業内容>"` を実行し、出力された資料（`パス<TAB>スコア`）も読む。「jev をスキップしました」と表示された場合（API キー未設定など）は従来どおり、1〜5 と自分で選んだ資料だけで進める
 
 ### 言語 → 規約ドキュメントの引き方
 
