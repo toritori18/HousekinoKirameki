@@ -1,9 +1,13 @@
 {
   "timeoutSec": 10,
+  "baseUrl": "https://api.typesafe.ai",
+  "model": "jev-latest",
   "features": {
     "tests": { "mode": "shadow", "threshold": 0.7 },
     "commitType": { "mode": "shadow", "threshold": 0.8 },
     "sources": { "mode": "shadow", "threshold": 0.2, "implementationThreshold": 0.5 },
-    "selectDocs": { "top": 3, "minScore": 1 }
+    "selectDocs": { "top": 3, "minScore": 1 },
+    "handoffSelect": { "mode": "shadow", "threshold": 0.6, "timeoutSec": 5 },
+    "topicShift": { "mode": "shadow", "threshold": 0.7, "timeoutSec": 5 }
   }
 }

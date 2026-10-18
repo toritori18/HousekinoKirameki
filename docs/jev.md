@@ -21,6 +21,23 @@ API 仕様の出典: <https://docs.typesafe.ai/api> 、<https://docs.typesafe.ai
 TYPESAFE_API_KEY=（取得したキー）
 ```
 
+### OpenRouter のキーを使う場合
+
+OpenRouter のキーを使うときは、`.env.local` に次の2行を書く。料金は OpenRouter のクレジットから引かれる。OpenRouter のキーを既定の接続先（api.typesafe.ai）へ送ると `http-401` で失敗する。
+
+```
+TYPESAFE_API_KEY=（OpenRouter のキー）
+TYPESAFE_BASE_URL=https://openrouter.ai/api
+```
+
+接続先は `/v1/systemone` を付けた `https://openrouter.ai/api/v1/systemone` になり、モデル ID は `jev-latest` → `~typesafe/jev-latest`、それ以外（例 `jev-1.13`）→ `typesafe/jev-1.13` に自動変換される（`/` を含む ID はそのまま）。
+
+接続先の決定順: 環境変数 `TYPESAFE_BASE_URL` > `.env.local` の `TYPESAFE_BASE_URL=` > config.json の `baseUrl` > 既定。ログには `provider`（`typesafe` / `openrouter`）と、返ってきた場合は `cost` を記録する。
+
+出典: <https://openrouter.ai/docs/guides/community/typesafe-sdk.md> 、<https://openrouter.ai/docs/guides/community/jev.md>
+
+**モデルが違うと確率も違うため、接続先やモデルを切り替えたら、しきい値（下記の設定表）を shadow のログで見直すこと。**
+
 キーが無い間、以下の機能はすべて無効（スキップ）になる。
 
 ## 機能
@@ -31,6 +48,8 @@ TYPESAFE_API_KEY=（取得したキー）
 | コミットの種類（commitType） | 同上 | メッセージ先頭の `feat:` 等が、変更内容と合っているかを問う |
 | 資料選び（selectDocs） | `.claude/jev/select-docs.ps1`、スキル `jev-select-docs` | 作業内容に関係する資料を `docs/` と README.md から選ぶ |
 | 出典の有無（sources） | Stop フック（`.claude/hooks/stop-check-sources.ps1`）、質問定義 `questions/sources.json` | ソースの未コミット変更があるとき、応答が実装報告であり（`isImplementation`）かつ出典または「出典なし」が含まれていない（`hasSources`）場合だけ指摘する。ソースの判定は project.json の `testing.sourcePatterns`、無ければ `contributing` の拡張子（`.md` / `.ps1` の変更は対象外）で行い、どちらも無ければ判定しない。`stop_hook_active` が true のとき・変更集合が前回判定時と同じとき・判定に失敗したときは何もしない。enforce は `decision: block`、shadow はログに記録するだけで何も返さない。フックの登録は `.claude/settings.json` |
+| 引き継ぎメモの選択（handoffSelect） | UserPromptSubmit フック（`.claude/hooks/handoff-prompt.ps1`）、質問定義 `questions/handoff.json` | セッション最初の依頼が、`.claude/handoff/` のどのメモの続きかを問う。該当すれば（確率がしきい値以上）メモの全文を注入する。詳細は [handoff.md](handoff.md) |
+| 話題の切り替え（topicShift） | 同上 | 2回目以降の依頼が、基準の作業（読み込み中メモの「目的」、無ければ最初の依頼）とは無関係な別の作業かを問う。しきい値以上なら、wrap でメモを書き出し `/clear` で区切ることの提案を注入する。プロンプトは止めない |
 
 ### テスト追加漏れ
 
@@ -69,6 +88,14 @@ shadow で `additionalContext` を返さないのは、Stop フックがそれ�
 
 Stop フックには `-SkipJev` が無い。回避するには `JEV_MODE_SOURCES=off` を設定する。
 
+UserPromptSubmit フック（handoffSelect / topicShift）:
+
+| モード | 動作 |
+|---|---|
+| `shadow` | 該当したときに `additionalContext`（メモの全文・wrap と `/clear` の提案）を注入する。ここでは注入が「通知」にあたる。プロンプトは止めない |
+| `enforce` | `shadow` と同じ（プロンプトを止めることはしない） |
+| `off` | jev を呼ばない |
+
 優先順位（上が優先）:
 
 1. 環境変数 `JEV_MODE_<機能名の大文字>`（例: `JEV_MODE_TESTS`、`JEV_MODE_COMMITTYPE`、`JEV_MODE_SELECTDOCS`、`JEV_MODE_SOURCES`）
@@ -83,15 +110,21 @@ enforce で止まったときは、指摘に沿って直して再実行するか
 | キー | 意味 | 初期値 |
 |---|---|---|
 | `timeoutSec` | 通信のタイムアウト（秒） | 10 |
+| `baseUrl` | 接続先の base URL（環境変数 `TYPESAFE_BASE_URL` と `.env.local` が優先） | `https://api.typesafe.ai` |
+| `model` | モデル ID（OpenRouter 向けは自動変換） | `jev-latest` |
 | `features.tests.threshold` | 「挙動を変える」確率がこの値以上で指摘 | 0.7 |
 | `features.commitType.threshold` | 種類が違う判定の confidence がこの値以上で指摘 | 0.8 |
 | `features.sources.threshold` | 「出典が含まれる」確率がこの値未満で指摘（Stop フック）。応答は末尾 8000 文字だけを送る（出典なしの暫定値） | 0.2 |
 | `features.sources.implementationThreshold` | 「応答が実装報告である」確率がこの値以上のときだけ sources を指摘する（出典なしの暫定値） | 0.5 |
+| `features.handoffSelect.threshold` | 選んだメモの confidence がこの値以上で、そのメモの全文を注入する（出典なしの暫定値） | 0.6 |
+| `features.handoffSelect.timeoutSec` | handoffSelect と topicShift の通信タイムアウト（秒）。プロンプト送信のたびに待たせるため短くしている（出典なしの暫定値） | 5 |
+| `features.topicShift.threshold` | 「別の作業」の確率がこの値以上で、wrap と `/clear` の提案を注入する（出典なしの暫定値） | 0.7 |
+| `features.topicShift.timeoutSec` | 同上（2つの機能を1リクエストにまとめるときは、大きいほうを使う） | 5 |
 | `features.selectDocs.top` | 出力する資料の最大件数 | 3 |
 | `features.selectDocs.minScore` | 出力する資料の最低スコア | 1 |
 | `features.selectDocs.maxCandidates`（省略可） | 一度に採点する候補資料の上限（0 以下は既定値に戻す） | 40 |
 
-**しきい値（0.7 / 0.8 / 0.2）と候補数の上限（40）、抜粋の長さ（400 文字）、差分の行数（200 行）は出典の無い暫定値である。** JSON にはコメントを書けないため、ここに明記する。shadow のログ（下記）で実際の確率の分布を見て調整すること。
+**しきい値（0.7 / 0.8 / 0.2。handoffSelect の 0.6、topicShift の 0.7、両者のタイムアウト 5 秒を含む）と候補数の上限（40）、抜粋の長さ（400 文字）、差分の行数（200 行）は出典の無い暫定値である。** JSON にはコメントを書けないため、ここに明記する。shadow のログ（下記）で実際の確率の分布を見て調整すること。
 
 質問文は `.claude/jev/questions/*.json` にコードと分けて置いてある。質問 ID はモデルに送られないため、質問の意味は instructions に完全に書く必要がある。質問文も暫定であり、ログを見て改善する前提である。
 
@@ -108,6 +141,8 @@ enforce で止まったときは、指摘に沿って直して再実行するか
 | 関数 | 役割 |
 |---|---|
 | `Get-JevApiKey` | API キーの取得（環境変数、無ければ `.env.local`） |
+| `Get-JevEnvLocalValue` | `.env.local` から指定名の行の値を取得する共通処理 |
+| `Get-JevBaseUrl` / `Get-JevProvider` / `Get-JevModelId` | 接続先の決定 / ホスト名から typesafe・openrouter を判定 / 送信するモデル ID の決定 |
 | `Get-JevConfig` / `Get-JevFeatureSetting` | `config.json` の読み込み / 機能ごとの設定値の取得 |
 | `Get-JevMode` | 機能ごとのモード解決 |
 | `Invoke-Jev` | jev への問い合わせ。例外を投げず、失敗時は `Skipped = $true` と理由を返す。`-Feature` はモード解決とログ用のラベルで API には送られない |

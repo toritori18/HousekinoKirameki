@@ -15,22 +15,28 @@
 # このファイルは .claude/jev/lib/ に置かれているため、1階層上が .claude/jev/ になる。
 $script:JevDir = Split-Path -Parent $PSScriptRoot
 
-$script:JevEndpoint = 'https://api.typesafe.ai/v1/systemone'
-$script:JevModel = 'jev-latest'
+# 接続先の切り替え（OpenRouter 経由）の出典:
+#   https://openrouter.ai/docs/guides/community/typesafe-sdk.md
+#   https://openrouter.ai/docs/guides/community/jev.md
+# - base URL は環境変数 TYPESAFE_BASE_URL で切り替える。OpenRouter は https://openrouter.ai/api で、
+#   後ろに /v1/systemone を付けた先へ送る。認証は同じ Authorization: Bearer <キー>（OpenRouter のキーでよい）
+# - OpenRouter 向けのモデル ID は、jev-latest → ~typesafe/jev-latest、jev-1.13 → typesafe/jev-1.13 に変換し、
+#   typesafe/... のように / を含む ID はそのまま使う（SDK と同じ）
+$script:JevDefaultBaseUrl = 'https://api.typesafe.ai'
+$script:JevDefaultModel = 'jev-latest'
 $script:JevValidModes = @('shadow', 'enforce', 'off')
 
 <#
 .SYNOPSIS
-    jev の API キーを返す。無ければ $null。
+    .env.local から指定名の行（NAME=値）の値を返す。無ければ $null。
 .DESCRIPTION
-    環境変数 TYPESAFE_API_KEY を優先し、無ければリポジトリルートの .env.local から
-    TYPESAFE_API_KEY= の行だけを読む（他の行は読まない）。値の前後の空白と引用符は除く。
+    指定名の行だけを読む（他の行は読まない）。値の前後の空白と引用符は除く。空値は $null。
 #>
-function Get-JevApiKey {
-    $fromEnv = $env:TYPESAFE_API_KEY
-    if (-not [string]::IsNullOrWhiteSpace($fromEnv)) {
-        return $fromEnv.Trim()
-    }
+function Get-JevEnvLocalValue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Name
+    )
 
     $envPath = Join-Path (Get-RepoRoot) '.env.local'
     if (-not (Test-Path -LiteralPath $envPath)) {
@@ -39,7 +45,7 @@ function Get-JevApiKey {
 
     try {
         foreach ($line in (Get-Content -LiteralPath $envPath -Encoding UTF8)) {
-            if ($line -notmatch '^\s*TYPESAFE_API_KEY\s*=\s*(.*?)\s*$') {
+            if ($line -notmatch ('^\s*' + [regex]::Escape($Name) + '\s*=\s*(.*?)\s*$')) {
                 continue
             }
             $value = $Matches[1]
@@ -57,6 +63,84 @@ function Get-JevApiKey {
         return $null
     }
     return $null
+}
+
+<#
+.SYNOPSIS
+    jev の API キーを返す。無ければ $null。
+.DESCRIPTION
+    環境変数 TYPESAFE_API_KEY を優先し、無ければ .env.local の TYPESAFE_API_KEY= の行を読む。
+#>
+function Get-JevApiKey {
+    $fromEnv = $env:TYPESAFE_API_KEY
+    if (-not [string]::IsNullOrWhiteSpace($fromEnv)) {
+        return $fromEnv.Trim()
+    }
+    return (Get-JevEnvLocalValue -Name 'TYPESAFE_API_KEY')
+}
+
+<#
+.SYNOPSIS
+    接続先の base URL（末尾の / を除いたもの）を返す。
+.DESCRIPTION
+    優先順位: 環境変数 TYPESAFE_BASE_URL > .env.local の TYPESAFE_BASE_URL= > config.json の baseUrl > 既定。
+#>
+function Get-JevBaseUrl {
+    $candidates = @(
+        $env:TYPESAFE_BASE_URL,
+        (Get-JevEnvLocalValue -Name 'TYPESAFE_BASE_URL'),
+        (Get-ConfigProperty -Object (Get-JevConfig) -Name 'baseUrl')
+    )
+    foreach ($candidate in $candidates) {
+        if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+            return ([string]$candidate).Trim().TrimEnd('/')
+        }
+    }
+    return $script:JevDefaultBaseUrl
+}
+
+<#
+.SYNOPSIS
+    接続先の種類（openrouter / typesafe）を base URL のホスト名から判定する。
+#>
+function Get-JevProvider {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $BaseUrl
+    )
+
+    try {
+        $hostName = ([System.Uri]$BaseUrl).Host
+        if ($hostName -eq 'openrouter.ai' -or $hostName.EndsWith('.openrouter.ai')) {
+            return 'openrouter'
+        }
+    }
+    catch { }
+    return 'typesafe'
+}
+
+<#
+.SYNOPSIS
+    送信するモデル ID を返す。config.json の model（既定 jev-latest）を、OpenRouter 向けなら SDK と同じ規則で変換する。
+#>
+function Get-JevModelId {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $BaseUrl
+    )
+
+    $model = Get-ConfigProperty -Object (Get-JevConfig) -Name 'model'
+    if ([string]::IsNullOrWhiteSpace($model)) {
+        $model = $script:JevDefaultModel
+    }
+    $model = ([string]$model).Trim()
+    if ((Get-JevProvider -BaseUrl $BaseUrl) -eq 'openrouter' -and -not $model.Contains('/')) {
+        if ($model -eq 'jev-latest') {
+            return '~typesafe/jev-latest'
+        }
+        return "typesafe/$model"
+    }
+    return $model
 }
 
 <#
@@ -323,7 +407,11 @@ function Invoke-Jev {
         [Parameter(Mandatory = $true)]
         $Questions,
 
-        [string] $Mode
+        [string] $Mode,
+
+        # 通信のタイムアウト（秒）。0 以下なら config.json の timeoutSec（無ければ 10）を使う。
+        # プロンプト送信のたびに走るフックなど、短く待たせたい呼び出し元だけが指定する（既存の呼び出し元は影響を受けない）
+        [int] $TimeoutSec = 0
     )
 
     if ([string]::IsNullOrWhiteSpace($Mode)) {
@@ -338,15 +426,21 @@ function Invoke-Jev {
         return (New-JevResult -Skipped $true -Reason 'no-key')
     }
 
-    $timeoutSec = Get-ConfigProperty -Object (Get-JevConfig) -Name 'timeoutSec'
-    if ($null -eq $timeoutSec -or [int]$timeoutSec -le 0) {
-        $timeoutSec = 10
+    if ($TimeoutSec -gt 0) {
+        $timeoutSec = $TimeoutSec
+    }
+    else {
+        $timeoutSec = Get-ConfigProperty -Object (Get-JevConfig) -Name 'timeoutSec'
+        if ($null -eq $timeoutSec -or [int]$timeoutSec -le 0) {
+            $timeoutSec = 10
+        }
     }
 
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     try {
+        $baseUrl = Get-JevBaseUrl
         $body = [ordered]@{
-            model     = $script:JevModel
+            model     = Get-JevModelId -BaseUrl $baseUrl
             state     = $State
             questions = $Questions
         }
@@ -355,7 +449,7 @@ function Invoke-Jev {
 
         [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
-        $response = Invoke-RestMethod -Uri $script:JevEndpoint -Method Post `
+        $response = Invoke-RestMethod -Uri ($baseUrl + '/v1/systemone') -Method Post `
             -Headers @{ Authorization = "Bearer $apiKey" } `
             -ContentType 'application/json; charset=utf-8' `
             -Body $bytes -TimeoutSec ([int]$timeoutSec)
@@ -443,8 +537,10 @@ function Write-JevLog {
             mode      = $Mode
             skipped   = $Result.Skipped
             reason    = $Result.Reason
+            provider  = Get-JevProvider -BaseUrl (Get-JevBaseUrl)
             model     = $Result.Model
             usage     = $Result.Usage
+            cost      = Get-ConfigProperty -Object $Result.Usage -Name 'cost'
             answers   = $answerLog
             elapsedMs = $Result.ElapsedMs
             decision  = $Decision

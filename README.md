@@ -75,6 +75,7 @@
     ├── project-config.md   # .claude/project.json の仕様
     ├── powershell-contributing.md # PowerShell の規約
     ├── jev.md              # jev による開発支援（API キー・設定・使い方）
+    ├── handoff.md          # 作業の引き継ぎメモ
     ├── direction-proposal.md # ゲームの方向性（宝石のきらめき）
     └── sql/                # SQLファイル（マイグレーション・初期データ等）
 ```
@@ -175,6 +176,7 @@ Claude Code が特定のタスクを委譲するサブエージェントの一�
 
 | スキル | 内容 |
 |---|---|
+| `wrap` | 作業を中断・終了するときに、作業の引き継ぎメモを `.claude/handoff/` に書き出す（`/wrap` コマンドで実行） |
 | `retrospective` | 振り返り報告書の書き方・テンプレート（`retrospective-writer` が使用） |
 | `jev-select-docs` | 作業に着手する前に、読むべき資料を jev に選ばせて絞り込む（`coder` が実装前に実行） |
 
@@ -185,6 +187,7 @@ Claude Code が特定のタスクを委譲するサブエージェントの一�
 - [プロジェクト設定（.claude/project.json）](docs/project-config.md)
 - [コントリビュートガイド（PowerShell）](docs/powershell-contributing.md)
 - [jev による開発支援](docs/jev.md)
+- [作業の引き継ぎメモ](docs/handoff.md)
 - [ゲームの方向性（宝石のきらめき）](docs/direction-proposal.md)
 
 言語ごとのコントリビュートガイドは /setup で `docs/` に配置されます（`docs/TS-contributing.md`・`docs/CS-contributing.md`・`docs/PY-contributing.md`）。
