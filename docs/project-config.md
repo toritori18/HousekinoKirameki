@@ -13,6 +13,8 @@
 | `.claude/commands/check.ps1`（/check の実体） | `check` に並ぶステップを順に実行する |
 | `.claude/commands/server/start.ps1` / `stop.ps1` | `devServer` の起動コマンドと待ち受けポート |
 | `.claude/commands/setup.ps1` | `install` の依存パッケージ導入コマンド |
+| `.claude/jev/check-commit.ps1`（/git:push から呼ばれる） | `testing` のパターン。ソースだけが変わりテストが変わっていないコミットを検出する（[jev.md](jev.md)） |
+| `.claude/jev/select-docs.ps1` | `docsExclude`（資料選びの候補から外すパス） |
 | `.claude/commands/verify-docs.ps1` | `docsExclude` の検査除外パターン |
 | `coder` / `code-reviewer` エージェント | `contributing` から、対象ファイルの拡張子に対応する規約ドキュメントを引く |
 
@@ -33,6 +35,8 @@
 | `check` | 文字列の配列 | /check で実行するステップを実行順に並べたもの |
 | `contributing` | オブジェクト | 拡張子（`.ts` 等）→ 規約ドキュメントのパスの対応表 |
 | `docsExclude` | 文字列の配列（省略可） | ドキュメント検査から外すパスのパターン（ワイルドカード可） |
+| `testing.sourcePatterns` | 文字列の配列（省略可） | 「ソースコード」とみなすパスのパターン。`-like` で照合するワイルドカード、区切りは `/` |
+| `testing.testPatterns` | 文字列の配列（省略可） | 「テスト」とみなすパスのパターン。書式は `sourcePatterns` と同じ |
 
 ### コマンドの書き方
 
@@ -53,6 +57,12 @@
 
 `check` に書く `verify-docs` だけは `commands` を参照せず、同梱の `.claude/commands/verify-docs.ps1` を実行する（言語に依存しないため）。
 それ以外の名前は `commands.<その名前>` を実行する。独自のステップ名を足すこともできる。
+
+### testing のパターン
+
+`testing` が無い（または project.json が無い）プロジェクトでは、jev によるテスト追加漏れの判定を行わない。
+
+パターンはステージ済みファイルのリポジトリルートからの相対パス（区切りは `/`）に対して、PowerShell の `-like` で照合する。`*` は `/` を含む任意の文字列に一致するため、`src/*` は `src/` 配下のすべて（サブディレクトリを含む）に、`*.test.ts` は階層を問わずその拡張子のファイルに一致する。大文字小文字は区別しない。
 
 ### contributing の対応表
 
@@ -80,6 +90,10 @@
     "build": "npm run build"
   },
   "check": ["verify-docs", "lint", "typecheck", "test", "build"],
+  "testing": {
+    "sourcePatterns": ["src/*"],
+    "testPatterns": ["tests/*", "*.test.ts", "*.test.tsx", "*.spec.ts", "*.spec.tsx"]
+  },
   "contributing": {
     ".ts": "docs/TS-contributing.md",
     ".ps1": "docs/powershell-contributing.md"

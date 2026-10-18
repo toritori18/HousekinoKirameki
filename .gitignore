@@ -32,7 +32,10 @@ docs/retrospective-*.md
 .claude/settings.local.json
 
 # Claude Code フックが生成する一時ファイル
-.claude/.stop-check-cache
+.claude/.stop-sources-cache
+
+# jev の呼び出しログ（判定結果の記録。端末ごとのため版管理しない）
+.claude/jev/logs/
 
 # OS
 .DS_Store

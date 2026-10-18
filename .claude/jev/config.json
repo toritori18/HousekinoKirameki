@@ -1,0 +1,9 @@
+{
+  "timeoutSec": 10,
+  "features": {
+    "tests": { "mode": "shadow", "threshold": 0.7 },
+    "commitType": { "mode": "shadow", "threshold": 0.8 },
+    "sources": { "mode": "shadow", "threshold": 0.2, "implementationThreshold": 0.5 },
+    "selectDocs": { "top": 3, "minScore": 1 }
+  }
+}
