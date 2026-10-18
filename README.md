@@ -54,6 +54,7 @@
 │   │   ├── check-commit.ps1 # コミット判定（ /git:push 内で実行）
 │   │   └── questions/      # jev の質問定義
 │   └── commands/           # カスタムスラッシュコマンド
+│       ├── *.md            # コマンド定義（build, check, deploy, format, lint, plan, setup, test, typecheck）
 │       ├── check.ps1       # /check の実体
 │       ├── run.ps1         # /lint・/format・/typecheck・/test・/build の実体
 │       ├── setup.ps1       # /setup の実体

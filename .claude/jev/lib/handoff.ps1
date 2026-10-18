@@ -126,7 +126,7 @@ function Get-HandoffNotes {
             $notes.Add($note)
         }
     }
-    return @($notes)
+    return $notes.ToArray()
 }
 
 <#
