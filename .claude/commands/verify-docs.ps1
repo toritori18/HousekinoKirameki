@@ -4,7 +4,8 @@
 # 検査するのは「実体を見れば決定的に判定できる」ものだけである。
 #   1. 相対リンクのリンク先ファイルが実在するか
 #   2. .md へのリンクに付いたアンカー（#見出し）が実在する見出しか
-#   3. 言及されているスラッシュコマンド（/xxx・/ns:xxx）が .claude/commands/ に実在するか
+#   3. 言及されているスラッシュコマンド（/xxx・/ns:xxx）が実在するか
+#      （.claude/commands/ のコマンド、.claude/skills/ のスキル、スクリプト内の許可リストにある Claude Code 組み込みコマンド）
 #
 # Windows PowerShell 5.1（Desktop エディション）から非対話で実行される
 # （docs/powershell-contributing.md の「実行環境」参照）。
@@ -193,6 +194,46 @@ if ($knownCommands.Count -eq 0) {
     exit 1
 }
 
+# プロジェクトのスキル（.claude/skills/<ディレクトリ>/SKILL.md）もスラッシュコマンドとして呼び出せる。
+# スキル名は SKILL.md のフロントマターの name を優先し、無ければディレクトリ名を使う
+# （name を省略するとディレクトリ名が使われる）。
+# 出典: https://code.claude.com/docs/en/skills
+# .claude/skills/ が無いプロジェクトでもエラーにしない。
+$skillsRoot = Join-Path $RepoRoot '.claude\skills'
+if (Test-Path -LiteralPath $skillsRoot) {
+    foreach ($skillDir in (Get-ChildItem -LiteralPath $skillsRoot -Directory)) {
+        $skillFile = Join-Path $skillDir.FullName 'SKILL.md'
+        if (-not (Test-Path -LiteralPath $skillFile)) {
+            continue
+        }
+        $skillName = $skillDir.Name
+        $skillLines = @(Get-Content -LiteralPath $skillFile -Encoding UTF8)
+        # フロントマターは先頭行の --- から次の --- まで
+        if ($skillLines.Count -gt 0 -and $skillLines[0].TrimEnd() -eq '---') {
+            for ($j = 1; $j -lt $skillLines.Count; $j++) {
+                if ($skillLines[$j].TrimEnd() -eq '---') {
+                    break
+                }
+                if ($skillLines[$j] -match '^name:\s*["'']?(?<n>[A-Za-z0-9_:-]+)["'']?\s*$') {
+                    $skillName = $Matches['n']
+                    break
+                }
+            }
+        }
+        $knownCommands['/' + $skillName] = $true
+    }
+}
+
+# Claude Code の組み込みコマンドのうち、このリポジトリの .md が実際に参照しているものだけを許可する。
+# ドキュメントで新たに組み込みコマンドを参照するときは、公式ドキュメントで実在を確認してここへ追加する。
+# 出典（コマンド一覧）: https://code.claude.com/docs/en/commands
+#   /clear   … 空のコンテキストで新しい会話を始める（「/clear [name]」）
+#   /compact … 会話を要約してコンテキストを空ける（「/compact [instructions]」）
+$builtInCommands = @('/clear', '/compact')
+foreach ($builtIn in $builtInCommands) {
+    $knownCommands[$builtIn] = $true
+}
+
 # 見出しスラッグは複数のファイルから参照されうるため、先に全ファイル分を集めておく。
 # キーは「展開後のパス」（stacks/ 配下のファイルも展開後の位置で引けるようにする）。
 $headingSets = @{}
@@ -307,11 +348,11 @@ if ($brokenAnchors.Count -gt 0) {
 if ($unknownCommands.Count -gt 0) {
     $hasError = $true
     Write-Host ""
-    Write-Host "ERROR: 以下の $($unknownCommands.Count) 件は .claude/commands/ に実在しないコマンドを参照しています:" -ForegroundColor Red
+    Write-Host "ERROR: 以下の $($unknownCommands.Count) 件は実在しないコマンドを参照しています（.claude/commands/ のコマンド・.claude/skills/ のスキル・許可リストの組み込みコマンドのいずれでもありません）:" -ForegroundColor Red
     foreach ($entry in ($unknownCommands | Sort-Object)) {
         Write-Host "  - $entry" -ForegroundColor Red
     }
-    Write-Host "  対応方法: コマンドが改名・削除されていないか確認し、記述を実在するコマンド名に修正してください。" -ForegroundColor Red
+    Write-Host "  対応方法: コマンドが改名・削除されていないか確認し、記述を実在するコマンド名に修正してください。組み込みコマンドの場合は公式ドキュメントで実在を確認し、verify-docs.ps1 の `$builtInCommands に追加してください。" -ForegroundColor Red
 }
 
 if ($hasError) {
