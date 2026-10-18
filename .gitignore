@@ -37,6 +37,9 @@ docs/retrospective-*.md
 # jev の呼び出しログ（判定結果の記録。端末ごとのため版管理しない）
 .claude/jev/logs/
 
+# 作業の引き継ぎメモと、セッションごとの状態ファイル（作業者個人の途中経過のため版管理しない）
+.claude/handoff/
+
 # OS
 .DS_Store
 Thumbs.db
