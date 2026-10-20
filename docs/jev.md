@@ -46,6 +46,7 @@ TYPESAFE_BASE_URL=https://openrouter.ai/api
 |---|---|---|
 | テスト追加漏れ（tests） | `.claude/jev/check-commit.ps1`（/git:push から呼ばれる） | ソースが変わりテストが変わっていないコミットで、「この変更はプログラムの挙動を変えるか」を問う |
 | コミットの種類（commitType） | 同上 | メッセージ先頭の `feat:` 等が、変更内容と合っているかを問う |
+| README の同期漏れ（readmeSync） | 同上 | コマンド・エージェント・スキル・スタックの変更や、ファイルの追加・削除・リネームがあるのに README.md がステージされていないコミットで、「README.md への反映が必要な変更か」を問う |
 | 資料選び（selectDocs） | `.claude/jev/select-docs.ps1`、スキル `jev-select-docs` | 作業内容に関係する資料を `docs/` と README.md から選ぶ |
 | 出典の有無（sources） | Stop フック（`.claude/hooks/stop-check-sources.ps1`）、質問定義 `questions/sources.json` | ソースの未コミット変更があるとき、応答が実装報告であり（`isImplementation`）かつ出典または「出典なし」が含まれていない（`hasSources`）場合だけ指摘する。ソースの判定は project.json の `testing.sourcePatterns`、無ければ `contributing` の拡張子（`.md` / `.ps1` の変更は対象外）で行い、どちらも無ければ判定しない。`stop_hook_active` が true のとき・変更集合が前回判定時と同じとき・判定に失敗したときは何もしない。enforce は `decision: block`、shadow はログに記録するだけで何も返さない。フックの登録は `.claude/settings.json` |
 | 引き継ぎメモの選択（handoffSelect） | UserPromptSubmit フック（`.claude/hooks/handoff-prompt.ps1`）、質問定義 `questions/handoff.json` | セッション最初の依頼が、`.claude/handoff/` のどのメモの続きかを問う。該当すれば（確率がしきい値以上）メモの全文を注入する。詳細は [handoff.md](handoff.md) |
@@ -62,13 +63,25 @@ TYPESAFE_BASE_URL=https://openrouter.ai/api
 
 メッセージ先頭が `feat|fix|refactor|docs|chore:` のときだけ問う（それ以外はスキップ）。jev の選んだ種類がメッセージと違い、かつ confidence がしきい値以上のときに指摘する。種類の定義は [git-rules.md](git-rules.md) の「コミットメッセージ規約」の表と同じ。
 
-### 2つが同時に該当するとき
+### README の同期漏れ
 
-テスト追加漏れとコミットの種類は1リクエストにまとめて問う。それぞれのモードは個別に解決する。
+CLAUDE.md の「コマンド・サブエージェント・スキル・スタック・ディレクトリ構成を変更したら readme-syncer エージェントで README.md を同期する」の漏れを検出する。次の3つがそろったときだけ指摘する（1・2 が成立したときだけ jev に問う）。
+
+1. ステージ済みファイル（`git diff --cached --name-status`）に監視対象の変更がある。監視対象は次のいずれか
+   - `features.readmeSync.watchPatterns`（`-like` のワイルドカード。既定は `.claude/commands/*`、`.claude/agents/*`、`.claude/skills/*`、`stacks/*`）に一致するファイル（状態は問わない）。`stacks/` は /setup が展開するスタック定義の置き場
+   - 上記以外でも、追加・削除・リネーム（A / D / R）されたファイル（ディレクトリ構成の変更の候補）
+2. README.md がステージされていない
+3. jev が「README.md への反映が必要」と答えた確率がしきい値以上（質問は `questions/readme-sync.json` の `needsReadmeUpdate`。既存のコマンド等の中身の修正だけで、名前・役割・使い方・ファイル構成が変わらないなら「いいえ」）
+
+jev に送る state は、監視対象の変更ファイル一覧（状態つき）、その差分の先頭 200 行（最大 20000 文字）、README.md の本文（先頭 20000 文字）。指摘文には「readme-syncer エージェントで README.md を同期してください」を含める。質問定義・README.md が読めない場合は、この機能だけ静かにスキップする。
+
+### 3つが同時に該当するとき
+
+テスト追加漏れ・コミットの種類・README の同期漏れは、該当するものを1リクエストにまとめて問う。それぞれのモードは個別に解決する。
 
 ## モード
 
-コミット時（tests / commitType）:
+コミット時（tests / commitType / readmeSync）:
 
 | モード | 動作 |
 |---|---|
@@ -98,7 +111,7 @@ UserPromptSubmit フック（handoffSelect / topicShift）:
 
 優先順位（上が優先）:
 
-1. 環境変数 `JEV_MODE_<機能名の大文字>`（例: `JEV_MODE_TESTS`、`JEV_MODE_COMMITTYPE`、`JEV_MODE_SELECTDOCS`、`JEV_MODE_SOURCES`）
+1. 環境変数 `JEV_MODE_<機能名の大文字>`（例: `JEV_MODE_TESTS`、`JEV_MODE_COMMITTYPE`、`JEV_MODE_READMESYNC`、`JEV_MODE_SELECTDOCS`、`JEV_MODE_SOURCES`）
 2. 環境変数 `JEV_MODE`
 3. `.claude/jev/config.json` の `features.<機能名>.mode`
 4. `shadow`
@@ -114,6 +127,8 @@ enforce で止まったときは、指摘に沿って直して再実行するか
 | `model` | モデル ID（OpenRouter 向けは自動変換） | `jev-latest` |
 | `features.tests.threshold` | 「挙動を変える」確率がこの値以上で指摘 | 0.7 |
 | `features.commitType.threshold` | 種類が違う判定の confidence がこの値以上で指摘 | 0.8 |
+| `features.readmeSync.threshold` | 「README.md への反映が必要」の確率がこの値以上で指摘（出典なしの暫定値） | 0.7 |
+| `features.readmeSync.watchPatterns` | 監視対象のパス（`-like` のワイルドカード。追加・削除・リネームされたファイルはこれに関係なく対象）。省略時はコード側の既定値 | `.claude/commands/*`、`.claude/agents/*`、`.claude/skills/*`、`stacks/*` |
 | `features.sources.threshold` | 「出典が含まれる」確率がこの値未満で指摘（Stop フック）。応答は末尾 8000 文字だけを送る（出典なしの暫定値） | 0.2 |
 | `features.sources.implementationThreshold` | 「応答が実装報告である」確率がこの値以上のときだけ sources を指摘する（出典なしの暫定値） | 0.5 |
 | `features.handoffSelect.threshold` | 選んだメモの confidence がこの値以上で、そのメモの全文を注入する（出典なしの暫定値） | 0.6 |
@@ -123,6 +138,8 @@ enforce で止まったときは、指摘に沿って直して再実行するか
 | `features.selectDocs.top` | 出力する資料の最大件数 | 3 |
 | `features.selectDocs.minScore` | 出力する資料の最低スコア | 1 |
 | `features.selectDocs.maxCandidates`（省略可） | 一度に採点する候補資料の上限（0 以下は既定値に戻す） | 40 |
+
+**readmeSync の threshold（0.7）、state に入れる README.md 本文の上限（20000 文字）は出典なし（暫定値）。**
 
 **しきい値（0.7 / 0.8 / 0.2。handoffSelect の 0.6、topicShift の 0.7、両者のタイムアウト 5 秒を含む）と候補数の上限（40）、抜粋の長さ（400 文字）、差分の行数（200 行）は出典の無い暫定値である。** JSON にはコメントを書けないため、ここに明記する。shadow のログ（下記）で実際の確率の分布を見て調整すること。
 

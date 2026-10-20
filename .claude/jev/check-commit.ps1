@@ -4,9 +4,11 @@
     [string] $Message
 )
 
-# コミット直前に jev で次の2点を判定する（/git:push から呼ばれる。単体でも実行できる）。
+# コミット直前に jev で次の3点を判定する（/git:push から呼ばれる。単体でも実行できる）。
 #   2. テスト追加漏れ: ソースが変わっているのにテストが1つも変わっていない場合に、挙動が変わる変更かを問う
 #   3. コミットの種類: メッセージ先頭のプレフィックス（feat 等）が変更内容と合っているかを問う
+#   4. README の同期漏れ: 監視対象（コマンド・エージェント・スキル・スタック、追加/削除/リネーム）の変更があり
+#      README.md がステージされていない場合に、README への反映が必要な変更かを問う
 # 「コードの条件 AND jev の判定がそろったときだけ指摘する」方針。
 #
 # 終了コード: 0 = 続行してよい（スキップ・問題なし・shadow での通知を含む）/ 2 = enforce で止めるべき指摘あり
@@ -20,8 +22,14 @@
 # 判定のしきい値（threshold）は出典の無い暫定値。config.json の既定が読めない場合の保険として同じ値を置く。
 $DefaultTestsThreshold = 0.7
 $DefaultCommitTypeThreshold = 0.8
+$DefaultReadmeSyncThreshold = 0.7
+# README 同期漏れの監視パターン（-like）の保険の既定値。config.json の features.readmeSync.watchPatterns が優先。
+# スタック定義の置き場は README.md の「stacks/ 配下のプロファイル」と /setup の実装（stacks/<名前>/）から特定した
+$DefaultReadmeWatchPatterns = @('.claude/commands/*', '.claude/agents/*', '.claude/skills/*', 'stacks/*')
+# 差分の行数・state の文字数・README の文字数の上限は出典なし（暫定値）
 $DiffMaxLines = 200
 $StateMaxChars = 20000
+$ReadmeMaxChars = 20000
 
 <#
 .SYNOPSIS
@@ -125,15 +133,97 @@ if ($typeActive) {
     }
 }
 
+# --- 4. README の同期漏れの対象判定（コードの条件） ---
+# 条件: (1) ステージ済みに監視対象の変更がある AND (2) README.md がステージされていない
+$readmeMode = Get-JevMode -Feature 'readmeSync'
+$readmeActive = $false
+$readmeThreshold = [double](Get-JevFeatureSetting -Feature 'readmeSync' -Name 'threshold' -Default $DefaultReadmeSyncThreshold)
+
+if ($readmeMode -ne 'off') {
+    $watchPatterns = @(Get-JevFeatureSetting -Feature 'readmeSync' -Name 'watchPatterns' -Default $null | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    if ($watchPatterns.Count -eq 0) {
+        $watchPatterns = $DefaultReadmeWatchPatterns
+    }
+
+    $global:LASTEXITCODE = 0
+    $nameStatus = @(git -C $RepoRoot -c core.quotepath=false diff --cached --name-status)
+    if ($LASTEXITCODE -eq 0) {
+        $watched = New-Object System.Collections.Generic.List[string]
+        $watchedPaths = New-Object System.Collections.Generic.List[string]
+        $readmeStaged = $false
+        foreach ($line in $nameStatus) {
+            if ([string]::IsNullOrWhiteSpace($line)) {
+                continue
+            }
+            # 形式: 状態<TAB>パス（リネームは 状態<TAB>旧パス<TAB>新パス）
+            $fields = $line -split "`t"
+            if ($fields.Count -lt 2) {
+                continue
+            }
+            $status = $fields[0].Substring(0, 1)
+            $paths = @($fields[1..($fields.Count - 1)])
+            if ($paths -contains 'README.md') {
+                $readmeStaged = $true
+            }
+            $inWatch = $false
+            foreach ($p in $paths) {
+                if (Test-AnyLike -Path $p -Patterns $watchPatterns) {
+                    $inWatch = $true
+                }
+            }
+            # 追加・削除・リネームはディレクトリ構成の変更の候補として、パスを問わず対象にする
+            if ($inWatch -or $status -in @('A', 'D', 'R')) {
+                $watched.Add("$status`t$($paths -join ' -> ')")
+                foreach ($p in $paths) {
+                    $watchedPaths.Add($p)
+                }
+            }
+        }
+        if ($watched.Count -gt 0 -and -not $readmeStaged) {
+            $readmeActive = $true
+        }
+    }
+}
+
+if ($readmeActive) {
+    # 質問定義・README・差分のどれかが読めない場合は、この機能だけ静かにスキップする
+    $readmeQuestions = Get-JevQuestionDefinition -Name 'readme-sync'
+    $readmeQuestion = Get-ConfigProperty -Object $readmeQuestions -Name 'needsReadmeUpdate'
+    $readmeText = $null
+    try {
+        $readmeText = Get-Content -LiteralPath (Join-Path $RepoRoot 'README.md') -Raw -Encoding UTF8 -ErrorAction Stop
+    }
+    catch {
+        $readmeText = $null
+    }
+    $global:LASTEXITCODE = 0
+    $readmeDiffLines = @(git -C $RepoRoot -c core.quotepath=false diff --cached -- @($watchedPaths | Select-Object -Unique))
+    if ($null -eq $readmeQuestion -or [string]::IsNullOrWhiteSpace($readmeText) -or $LASTEXITCODE -ne 0) {
+        $readmeActive = $false
+    }
+    else {
+        $readmeDiff = (@($readmeDiffLines | Select-Object -First $DiffMaxLines) -join "`n")
+        if ($readmeDiff.Length -gt $StateMaxChars) {
+            $readmeDiff = $readmeDiff.Substring(0, $StateMaxChars)
+        }
+        if ($readmeText.Length -gt $ReadmeMaxChars) {
+            $readmeText = $readmeText.Substring(0, $ReadmeMaxChars)
+        }
+        $stateParts.Add("## 変更ファイル（状態 A=追加 M=変更 D=削除 R=リネーム）`n$($watched -join "`n")`n`n## 差分（先頭 $DiffMaxLines 行）`n$readmeDiff`n`n## README.md の本文（先頭 $ReadmeMaxChars 文字）`n$readmeText")
+        $questions['needsReadmeUpdate'] = $readmeQuestion
+    }
+}
+
 if ($questions.Count -eq 0) {
     exit 0
 }
 
-# --- jev への問い合わせ（②③が両方該当するときは1リクエスト） ---
-# どちらかが off の場合はその質問を含めていない。残った機能の mode は off ではないので shadow を渡して呼ぶ。
+# --- jev への問い合わせ（②③④が複数該当するときは1リクエスト） ---
+# off の機能はその質問を含めていない。残った機能の mode は off ではないので shadow を渡して呼ぶ。
 $featureLabel = (@(
         if ($testsActive) { 'tests' }
         if ($typeActive) { 'commitType' }
+        if ($readmeActive) { 'readmeSync' }
     ) -join '+')
 $result = Invoke-Jev -Feature $featureLabel -State ($stateParts -join "`n`n") -Questions $questions -Mode 'shadow'
 
@@ -147,6 +237,9 @@ if ($result.Skipped) {
     }
     if ($typeActive) {
         Write-JevLog -Feature 'commitType' -Mode $typeMode -Result $result -Decision 'skipped' -AnswerIds @('commitType')
+    }
+    if ($readmeActive) {
+        Write-JevLog -Feature 'readmeSync' -Mode $readmeMode -Result $result -Decision 'skipped' -AnswerIds @('needsReadmeUpdate')
     }
     exit 0
 }
@@ -193,6 +286,27 @@ if ($typeActive) {
         }
     }
     Write-JevLog -Feature 'commitType' -Mode $typeMode -Result $result -Decision $decision -AnswerIds @('commitType')
+}
+
+# --- 4. README の同期漏れの判定 ---
+if ($readmeActive) {
+    $readmeProbability = Get-JevNoulValue -Answers $result.Answers -Id 'needsReadmeUpdate'
+    $decision = 'pass'
+    if ($null -eq $readmeProbability) {
+        $decision = 'no-answer'
+    }
+    elseif ([double]$readmeProbability -ge $readmeThreshold) {
+        $percent = ([double]$readmeProbability).ToString('0.00', [System.Globalization.CultureInfo]::InvariantCulture)
+        if ($readmeMode -eq 'enforce') {
+            $decision = 'flagged-stop'
+            $stopMessages.Add("README.md に反映が必要な変更の可能性が高いですが、README.md がステージされていません（確率 $percent、しきい値 $readmeThreshold）。`n  対応方法: readme-syncer エージェントで README.md を同期してください。同期が不要と判断する場合は -SkipJev を付けて続行できます。")
+        }
+        else {
+            $decision = 'flagged-shadow'
+            Write-Host "WARNING: jev(shadow): README.md の同期漏れの疑いがあります（反映が必要な確率 $percent）。readme-syncer エージェントで README.md を同期してください。記録のみ（shadow）でコミットは止めません。止めたい場合は環境変数 JEV_MODE_READMESYNC=enforce（または .claude/jev/config.json の features.readmeSync.mode）を設定してください。" -ForegroundColor Yellow
+        }
+    }
+    Write-JevLog -Feature 'readmeSync' -Mode $readmeMode -Result $result -Decision $decision -AnswerIds @('needsReadmeUpdate')
 }
 
 if ($stopMessages.Count -gt 0) {

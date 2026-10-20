@@ -13,7 +13,7 @@
 | `.claude/commands/check.ps1`（/check の実体） | `check` に並ぶステップを順に実行する |
 | `.claude/commands/server/start.ps1` / `stop.ps1` | `devServer` の起動コマンドと待ち受けポート |
 | `.claude/commands/setup.ps1` | `install` の依存パッケージ導入コマンド |
-| `.claude/jev/check-commit.ps1`（/git:push から呼ばれる） | `testing` のパターン。ソースだけが変わりテストが変わっていないコミットを検出する（[jev.md](jev.md)） |
+| `.claude/jev/check-commit.ps1`（/git:push から呼ばれる） | `testing` のパターン。ソースだけが変わりテストが変わっていないコミットを検出する。README.md の同期漏れ・コミットの種類の判定も行う（[jev.md](jev.md)） |
 | `.claude/jev/select-docs.ps1` | `docsExclude`（資料選びの候補から外すパス） |
 | `.claude/commands/verify-docs.ps1` | `docsExclude` の検査除外パターン |
 | `coder` / `code-reviewer` エージェント | `contributing` から、対象ファイルの拡張子に対応する規約ドキュメントを引く |

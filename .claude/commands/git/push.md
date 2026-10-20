@@ -25,10 +25,11 @@ git status --porcelain
 
 ## jev による判定
 
-コミットの直前に、`.claude/jev/check-commit.ps1` が jev（型付きの判断を返す API）で次の2点を判定します。詳細は [docs/jev.md](../../../docs/jev.md) を参照してください。
+コミットの直前に、`.claude/jev/check-commit.ps1` が jev（型付きの判断を返す API）で次の3点を判定します。詳細は [docs/jev.md](../../../docs/jev.md) を参照してください。
 
 - テスト追加漏れ（`.claude/project.json` の `testing` が定義されているときのみ）
 - コミットメッセージの種類（`feat:` など）が変更内容と合っているか
+- README.md の同期漏れ（コマンド・エージェント・スキル・スタックの変更や、ファイルの追加・削除・リネームがあるのに README.md がステージされていない）
 
 API キー（`TYPESAFE_API_KEY`）が無いプロジェクトでは何も行われません。既定の shadow モードでは記録と1行の通知だけで、コミットは止まりません。enforce モードで指摘があるとコミットせずに終了し（ステージは残ります）、直したうえで再実行するか、`-SkipJev` を付けて判定を行わずに続行します。
 
