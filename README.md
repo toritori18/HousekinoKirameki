@@ -129,7 +129,7 @@ Claude Code で使えるカスタムスラッシュコマンドの一覧です�
 | `/git:status` | 変更ファイルの一覧を表示 | `git status` | 随時 |
 | `/git:diff` | 変更内容の差分を表示 | `git diff` | コミット前の確認 |
 | `/git:log` | コミット履歴を1行ずつ表示 | `git log --oneline` | 随時 |
-| `/git:push "<メッセージ>"` | シークレット・ブランチ（main 禁止・マージ済み）をチェックし、jev でテスト追加漏れ・コミット種類を判定してからコミット＆プッシュ（push 時に pre-push フックが機密情報チェックと /check を実行） | `git/push.ps1` | 作業の区切り |
+| `/git:push "<メッセージ>"` | シークレット・ブランチ（main 禁止・マージ済み）をチェックし、jev でテスト追加漏れ・コミット種類・README 同期漏れを判定してからコミット＆プッシュ（push 時に pre-push フックが機密情報チェックと /check を実行） | `git/push.ps1` | 作業の区切り |
 | `/git:pr` | 現在のブランチから main への PR を作成 | `gh pr create` | プッシュ後 |
 | `/git:merge` | CI の成功を確認して PR を main へマージ | `gh pr merge` | PR 作成後 |
 | `/git:cleanup` | マージ済みのローカルブランチを整理（既定は一覧表示のみ） | `git/cleanup.ps1` | ブランチが溜まったとき |
