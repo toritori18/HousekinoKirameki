@@ -1,4 +1,4 @@
-﻿# git リポジトリを初期化し、git hooks（pre-push の機密情報チェック）を登録する
+﻿# git リポジトリを初期化し、git hooks（pre-push の機密情報チェック・/check）を登録する
 
 # Claude Code は出力を UTF-8 として読むため、stdout を UTF-8 に固定する（文字化け防止）
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -20,4 +20,4 @@ if (-not $?) {
     exit 1
 }
 
-Write-Host "git リポジトリを初期化し、git hooks を登録しました（.claude/hooks）。" -ForegroundColor Green
+Write-Host "git リポジトリを初期化し、git hooks（pre-push の機密情報チェック・/check）を登録しました（.claude/hooks）。" -ForegroundColor Green

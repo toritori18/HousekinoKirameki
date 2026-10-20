@@ -1,4 +1,4 @@
-git リポジトリを初期化し、git hooks（pre-push の機密情報チェック）を登録してください。
+git リポジトリを初期化し、git hooks（pre-push の機密情報チェック・/check）を登録してください。
 
 ```powershell
 .\.claude\commands\git\init.ps1

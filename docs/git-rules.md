@@ -2,11 +2,14 @@
 
 ## リポジトリの初期化
 
-クローン直後（または新規作成直後）に /git:init を実行する。git の初期化と、push 前の機密情報チェック（`.claude/hooks/pre-push`）の登録が行われる。
+クローン直後（または新規作成直後）に /git:init を実行する。git の初期化と、push 前のチェック（機密情報チェックと `/check`。`.claude/hooks/pre-push`）の登録が行われる。
 
 ## 基本方針
 
 - `main` への直接コミット・プッシュは禁止（`/git:push` コマンドでもブロックされる）
+- PR をマージしたブランチで作業を続けない。`/git:push` は、現在のブランチの PR がマージ済み（OPEN な PR が無い）だとエラーで止まる。新しいブランチを `/git:branch` で作り直す
+- `/git:branch` は現在のブランチではなく、常に最新の `origin/main` から分岐する（upstream は設定しない。未コミットの変更はそのまま持っていかれる）。fetch に失敗したときは手元の `origin/main` を、`origin/main` が無いときは現在の HEAD を起点にし、どちらも WARNING を出す
+- push 時は pre-push フックが機密情報チェックのあとに `/check` を実行し、失敗すると push をブロックする（CI の check ジョブと同じ検査を push 前に通すため）。`git push --no-verify` で回避できるが、機密情報チェックも飛ばすため推奨しない。powershell が無い環境では `/check` はスキップされる
 - プッシュは生の `git push` ではなく必ず `/git:push` コマンドを使う
 - **機能追加** は `feature/<機能名>` ブランチで作業し、PR 経由で main へマージする
 - **バグ修正** は `fix/<バグ名>` ブランチで作業し、PR 経由で main へマージする

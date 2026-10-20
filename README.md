@@ -94,7 +94,7 @@
 ```
 /setup              # 利用できるスタックの一覧を表示する（何も変更しない）
 /setup nextjs-ts    # スタックを展開し、.claude/project.json を作り、依存をインストールする
-/git:init           # git の初期化と hooks（push 前の機密情報チェック）の登録
+/git:init           # git の初期化と hooks（push 前の機密情報チェック・/check）の登録
 ```
 
 ## カスタムコマンド
@@ -125,11 +125,11 @@ Claude Code で使えるカスタムスラッシュコマンドの一覧です�
 | コマンド | 内容 | 実体 | 使うタイミング |
 |---|---|---|---|
 | `/git:init` | git リポジトリの初期化と hooks の登録 | `git/init.ps1` | クローン直後に1回 |
-| `/git:branch <名前>` | ブランチを作成してチェックアウト（`feature/…` `fix/…` `docs/…`） | `git/branch.ps1` | 作業開始時 |
+| `/git:branch <名前>` | 最新の origin/main からブランチを作成してチェックアウト（`feature/…` `fix/…` `docs/…`） | `git/branch.ps1` | 作業開始時 |
 | `/git:status` | 変更ファイルの一覧を表示 | `git status` | 随時 |
 | `/git:diff` | 変更内容の差分を表示 | `git diff` | コミット前の確認 |
 | `/git:log` | コミット履歴を1行ずつ表示 | `git log --oneline` | 随時 |
-| `/git:push "<メッセージ>"` | シークレット・main 直プッシュ・テスト追加漏れ・コミット種類をチェックした上でコミット＆プッシュ（jev による判定を含む） | `git/push.ps1` | 作業の区切り |
+| `/git:push "<メッセージ>"` | シークレット・ブランチ（main 禁止・マージ済み）をチェックし、jev でテスト追加漏れ・コミット種類を判定してからコミット＆プッシュ（push 時に pre-push フックが機密情報チェックと /check を実行） | `git/push.ps1` | 作業の区切り |
 | `/git:pr` | 現在のブランチから main への PR を作成 | `gh pr create` | プッシュ後 |
 | `/git:merge` | CI の成功を確認して PR を main へマージ | `gh pr merge` | PR 作成後 |
 | `/git:cleanup` | マージ済みのローカルブランチを整理（既定は一覧表示のみ） | `git/cleanup.ps1` | ブランチが溜まったとき |
