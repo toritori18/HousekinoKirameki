@@ -72,6 +72,27 @@
             "shell": "powershell"
           }
         ]
+      },
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "& ./.claude/hooks/handoff-list.ps1",
+            "shell": "powershell"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "& ./.claude/hooks/handoff-prompt.ps1",
+            "shell": "powershell"
+          }
+        ]
       }
     ]
   }
