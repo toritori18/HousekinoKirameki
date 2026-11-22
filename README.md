@@ -1,11 +1,11 @@
-# {{プロジェクト名}}
+# 宝石のきらめき CPU対戦ゲーム
 
-{{プロジェクトの簡単な説明}}
+ボードゲーム「宝石のきらめき（Splendor）」を、ブラウザでコンピュータと対戦できるようにするプロジェクトです。方向性は [docs/direction-proposal.md](docs/direction-proposal.md) にまとめています。
 
 ## 機能
 
-- {{機能1}}
-- {{機能2}}
+- 2〜4人で対戦する（人間1人 + CPU 1〜3体）
+- CPU の強さを段階的に選べる（Random → Heuristic → Jev）
 
 ## このひな形について
 
@@ -23,14 +23,14 @@
 |---|---|---|
 | `nextjs-ts` | Next.js (Pages Router) + TypeScript + Vitest + Prettier | `npm run lint` / `npm run typecheck` / `npm run test` / `npm run build` |
 | `dotnet` | .NET (C#) + xUnit | `dotnet format` / `dotnet test` / `dotnet build` |
-| `python` | Python + ruff + mypy + pytest | `ruff check` / `mypy` / `pytest` |
+| `python` | Python + ruff + mypy + pytest | `ruff check` / `ruff format` / `mypy` / `pytest` |
 
 どれにも当てはまらない場合は、新しいプロファイルを作って追加できます（[docs/project-config.md](docs/project-config.md) の「スタックを追加するには」）。
 
 ## ディレクトリ構成
 
 ```
-{{プロジェクト名}}/
+HousekinoKirameki/
 ├── CLAUDE.md               # Claude Code 向けガイド
 ├── README.md               # このファイル（プロジェクト説明）
 ├── .editorconfig           # 文字コード・改行・インデントの規約
@@ -63,6 +63,8 @@
 │       ├── git/            # Git関連
 │       ├── server/         # サーバー関連
 │       └── db/             # DB関連
+├── src/                    # ソースコード（/setup で展開される）
+├── tests/                  # テスト（/setup で展開される）
 ├── stacks/                 # 言語・フレームワークごとのプロファイル
 │   ├── nextjs-ts/
 │   │   ├── stack.json      # .claude/project.json の元になる定義
